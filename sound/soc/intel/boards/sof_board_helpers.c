@@ -3,6 +3,7 @@
 // Copyright(c) 2023 Intel Corporation
 
 #include <sound/soc.h>
+#include <sound/pcm_params.h>
 #include "../common/soc-intel-quirks.h"
 #include "hda_dsp_common.h"
 #include "sof_board_helpers.h"
@@ -450,6 +451,32 @@ static int set_hdmi_in_link(struct device *dev, struct snd_soc_dai_link *link,
 	return 0;
 }
 
+/*
+ * Force fixed hw_params on the HDA analog BE. A compress-capture DPCM FE hands
+ * the BE all-zero hw_params (see sound/soc/soc-compress.c) and relies on the
+ * machine driver's be_hw_params_fixup to supply rate/channels/format; without
+ * it the HDA capture link/DMA is programmed with format 0 and the DSP
+ * dai-copier START hangs (SET_PIPELINE_STATE RUNNING times out, -110). Safe for
+ * the normal analog playback/capture path: this HDA analog codec runs
+ * 48 kHz / 2ch / S32_LE.
+ */
+static int hda_analog_be_fixup(struct snd_soc_pcm_runtime *rtd,
+			       struct snd_pcm_hw_params *params)
+{
+	struct snd_interval *rate = hw_param_interval(params,
+						     SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *channels = hw_param_interval(params,
+						SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_mask *fmt = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+
+	rate->min = rate->max = 48000;
+	channels->min = channels->max = 2;
+	snd_mask_none(fmt);
+	snd_mask_set(fmt, (__force int)SNDRV_PCM_FORMAT_S32_LE);
+
+	return 0;
+}
+
 static int set_hda_codec_link(struct device *dev, struct snd_soc_dai_link *link,
 			      int be_id, enum sof_hda_be_type be_type)
 {
@@ -490,8 +517,10 @@ static int set_hda_codec_link(struct device *dev, struct snd_soc_dai_link *link,
 	link->num_platforms = ARRAY_SIZE(platform_component);
 
 	link->id = be_id;
-	if (be_type == SOF_HDA_ANALOG)
+	if (be_type == SOF_HDA_ANALOG) {
 		link->init = hda_init;
+		link->be_hw_params_fixup = hda_analog_be_fixup;
+	}
 	link->no_pcm = 1;
 
 	return 0;
