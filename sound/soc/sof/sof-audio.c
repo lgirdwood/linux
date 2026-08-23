@@ -594,6 +594,7 @@ sink_free:
 								dir, spcm, list);
 			if (err < 0)
 				ret = err;
+			p->walking = false;
 		}
 	}
 
