@@ -189,23 +189,23 @@ static const struct upboard_fpga_data upboard_up2_fpga_data = {
 
 static int upboard_fpga_gpio_init(struct upboard_fpga *fpga)
 {
-	fpga->enable_gpio = devm_gpiod_get(fpga->dev, "enable", GPIOD_ASIS);
+	fpga->enable_gpio = devm_gpiod_get(fpga->dev, "enable", GPIOD_ASIS | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	if (IS_ERR(fpga->enable_gpio))
 		return PTR_ERR(fpga->enable_gpio);
 
-	fpga->clear_gpio = devm_gpiod_get(fpga->dev, "clear", GPIOD_OUT_LOW);
+	fpga->clear_gpio = devm_gpiod_get(fpga->dev, "clear", GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	if (IS_ERR(fpga->clear_gpio))
 		return PTR_ERR(fpga->clear_gpio);
 
-	fpga->strobe_gpio = devm_gpiod_get(fpga->dev, "strobe", GPIOD_OUT_LOW);
+	fpga->strobe_gpio = devm_gpiod_get(fpga->dev, "strobe", GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	if (IS_ERR(fpga->strobe_gpio))
 		return PTR_ERR(fpga->strobe_gpio);
 
-	fpga->datain_gpio = devm_gpiod_get(fpga->dev, "datain", GPIOD_OUT_LOW);
+	fpga->datain_gpio = devm_gpiod_get(fpga->dev, "datain", GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	if (IS_ERR(fpga->datain_gpio))
 		return PTR_ERR(fpga->datain_gpio);
 
-	fpga->dataout_gpio = devm_gpiod_get(fpga->dev, "dataout", GPIOD_IN);
+	fpga->dataout_gpio = devm_gpiod_get(fpga->dev, "dataout", GPIOD_IN | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 	if (IS_ERR(fpga->dataout_gpio))
 		return PTR_ERR(fpga->dataout_gpio);
 
