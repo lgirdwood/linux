@@ -58,6 +58,10 @@ static int sdw_clock_stop_quirks = SDW_INTEL_CLK_STOP_BUS_RESET;
 module_param(sdw_clock_stop_quirks, int, 0444);
 MODULE_PARM_DESC(sdw_clock_stop_quirks, "SOF SoundWire clock stop quirks");
 
+static int sdw_link_mask = 0;
+module_param(sdw_link_mask, int, 0444);
+MODULE_PARM_DESC(sdw_link_mask, "SOF SoundWire link mask override (0 = disable)");
+
 static int sdw_params_stream(struct device *dev,
 			     struct sdw_intel_stream_params_data *params_data)
 {
@@ -141,6 +145,9 @@ static int hda_sdw_acpi_scan(struct snd_sof_dev *sdev)
 	acpi_handle handle;
 	int ret;
 
+	if (sdw_link_mask == 0)
+		return 0;
+
 	if (!(interface_mask & BIT(SOF_DAI_INTEL_ALH)))
 		return -EINVAL;
 
@@ -215,6 +222,13 @@ static int hda_sdw_probe(struct snd_sof_dev *sdev)
 	/* we could filter links here if needed, e.g for quirks */
 	res.count = hdev->info.count;
 	res.link_mask = hdev->info.link_mask;
+	if (sdw_link_mask >= 0)
+		res.link_mask = sdw_link_mask;
+
+	if (!res.link_mask) {
+		dev_info(sdev->dev, "SoundWire disabled (link_mask=0)\n");
+		return 0;
+	}
 
 	sdw = sdw_intel_probe(&res);
 	if (!sdw) {
@@ -488,7 +502,7 @@ static char *hda_model;
 module_param(hda_model, charp, 0444);
 MODULE_PARM_DESC(hda_model, "Use the given HDA board model.");
 
-static int dmic_num_override = -1;
+static int dmic_num_override = 2;
 module_param_named(dmic_num, dmic_num_override, int, 0444);
 MODULE_PARM_DESC(dmic_num, "SOF HDA DMIC number");
 

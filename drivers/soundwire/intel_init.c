@@ -174,7 +174,7 @@ static struct sdw_intel_ctx
 	if (!adev)
 		return NULL;
 
-	if (!res->count)
+	if (!res->count || !res->link_mask)
 		return NULL;
 
 	count = res->count;
