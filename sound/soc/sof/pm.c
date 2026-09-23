@@ -37,12 +37,22 @@ static u32 snd_sof_dsp_power_target(struct snd_sof_dev *sdev)
 		break;
 	case SOF_SUSPEND_S0IX:
 		/*
-		 * Currently, the only criterion for retaining the DSP in D0
-		 * is that there are streams that ignored the suspend trigger.
+		 * Retain the DSP in D0 if either
+		 *  - a stream ignored the suspend trigger, or
+		 *  - every open stream is topology-declared D0I3 compatible.
+		 *
+		 * The second case is what makes Wake-on-Voice work: the WoV
+		 * capture PCM is declared D0I3 compatible in topology, and it
+		 * must keep the DSP in D0 for as long as it is open, not only
+		 * once it has been running long enough to take a suspend
+		 * trigger. Relying on the trigger alone loses the wake path
+		 * whenever userspace has the PCM open but not yet streaming.
+		 *
 		 * Additional criteria such Soundwire clock-stop mode and
 		 * device suspend latency considerations will be added later.
 		 */
-		if (snd_sof_stream_suspend_ignored(sdev))
+		if (snd_sof_stream_suspend_ignored(sdev) ||
+		    snd_sof_dsp_only_d0i3_compatible_stream_active(sdev))
 			target_dsp_state = SOF_DSP_PM_D0;
 		else
 			target_dsp_state = SOF_DSP_PM_D3;
