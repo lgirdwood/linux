@@ -3734,6 +3734,9 @@ int snd_hda_multi_out_analog_open(struct hda_codec *codec,
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	bool notify_share_sw = false;
 
+	if (!runtime)
+		return 0;
+
 	runtime->hw.channels_max = mout->max_channels;
 	if (mout->dig_out_nid) {
 		if (!mout->analog_rates) {
@@ -3791,7 +3794,7 @@ int snd_hda_multi_out_analog_prepare(struct hda_codec *codec,
 				     struct snd_pcm_substream *substream)
 {
 	const hda_nid_t *nids = mout->dac_nids;
-	int chs = substream->runtime->channels;
+	int chs = substream->runtime ? substream->runtime->channels : 2;
 	struct hda_spdif_out *spdif;
 	int i;
 

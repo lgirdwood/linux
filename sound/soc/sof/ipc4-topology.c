@@ -1610,6 +1610,15 @@ static int sof_ipc4_init_output_audio_fmt(struct snd_sof_dev *sdev,
 			goto out_fmt;
 	}
 
+	/*
+	 * Fallback: if no format matches reference parameters (e.g. multi-pin process module
+	 * changing channel counts such as ECNS with 1ch out on pin 0 / pin 1), choose Pin 0 format
+	 */
+	for (i = 0; i < pin_fmts_size; i++) {
+		if (pin_fmts[i].pin_index == 0)
+			goto out_fmt;
+	}
+
 	dev_err(sdev->dev,
 		"%s: Unsupported audio format: %uHz, %ubit, %u channels, type: %d\n",
 		__func__, out_ref_rate, out_ref_valid_bits, out_ref_channels,
