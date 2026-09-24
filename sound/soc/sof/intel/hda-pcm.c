@@ -366,6 +366,35 @@ int hda_dsp_pcm_open(struct snd_sof_dev *sdev,
 	    spcm->stream[substream->stream].dsp_max_burst_size_in_ms <= 1)
 		runtime->hw.info |= SNDRV_PCM_INFO_RESUME;
 
+	dev_dbg(sdev->dev, "WOVDEBUG pcm%d dir %d d0i3=%d\n", spcm->pcm.pcm_id,
+		substream->stream, spcm->stream[substream->stream].d0i3_compatible);
+
+	/*
+	 * WoV capture streams legitimately have no data (and thus no period
+	 * elapsed) until a real or synthetic wake-word detection occurs, which
+	 * can be arbitrarily far in the future. Advertise NO_PERIOD_WAKEUP so
+	 * applications can opt out of the core PCM wait_for_avail() watchdog
+	 * (sound/core/pcm_lib.c), which otherwise aborts a blocking read()
+	 * with -EIO after ~buffer_size/rate*1.1 seconds of silence.
+	 */
+	if (direction == SNDRV_PCM_STREAM_CAPTURE &&
+	    spcm->stream[substream->stream].d0i3_compatible)
+		runtime->hw.info |= SNDRV_PCM_INFO_NO_PERIOD_WAKEUP;
+
+	/*
+	 * sof_pcm_trigger() no-ops SUSPEND/RESUME for suspend_ignored streams
+	 * so the DSP pipeline is left running across system suspend, but
+	 * generic ASoC DAPM has no idea: its own suspend/resume widget
+	 * power-down/up sequencing will still try to tear down and recreate
+	 * this DAI link's pipeline widgets, desyncing host and firmware
+	 * pipeline state (freeing a pipeline the DSP never freed, then
+	 * failing to recreate one that still exists). Exempt the link from
+	 * DAPM suspend power-sequencing while the WoV stream is open.
+	 */
+	if (direction == SNDRV_PCM_STREAM_CAPTURE &&
+	    spcm->stream[substream->stream].d0i3_compatible)
+		rtd->dai_link->ignore_suspend = 1;
+
 	dsp_stream = hda_dsp_stream_get(sdev, direction, flags);
 	if (!dsp_stream) {
 		dev_err(sdev->dev, "error: no stream available\n");
@@ -483,9 +512,12 @@ EXPORT_SYMBOL_NS(hda_dsp_compr_open, "SND_SOC_SOF_INTEL_HDA_COMMON");
 int hda_dsp_pcm_close(struct snd_sof_dev *sdev,
 		      struct snd_pcm_substream *substream)
 {
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
+	struct snd_soc_component *scomp = sdev->component;
 	struct hdac_stream *hstream = substream->runtime->private_data;
 	int direction = substream->stream;
 	int ret;
+	struct snd_sof_pcm *spcm;
 
 	ret = hda_dsp_stream_put(sdev, direction, hstream->stream_tag);
 
@@ -496,6 +528,11 @@ int hda_dsp_pcm_close(struct snd_sof_dev *sdev,
 
 	/* unbinding pcm substream to hda stream */
 	substream->runtime->private_data = NULL;
+
+	spcm = snd_sof_find_spcm_dai(scomp, rtd);
+	if (spcm && direction == SNDRV_PCM_STREAM_CAPTURE &&
+	    spcm->stream[direction].d0i3_compatible)
+		rtd->dai_link->ignore_suspend = 0;
 	return 0;
 }
 EXPORT_SYMBOL_NS(hda_dsp_pcm_close, "SND_SOC_SOF_INTEL_HDA_COMMON");
