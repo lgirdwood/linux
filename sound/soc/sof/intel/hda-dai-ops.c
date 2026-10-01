@@ -580,6 +580,7 @@ static int hda_ipc4_post_trigger(struct snd_sof_dev *sdev, struct snd_soc_dai *c
 		 * been stopped. So, clear the started_count so that the pipeline can be reset
 		 */
 		swidget->spipe->started_count = 0;
+		pipeline->state = SOF_IPC4_PIPE_RESET;
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		break;
