@@ -802,6 +802,25 @@ static void sof_ipc4_module_notification_handler(struct snd_sof_dev *sdev,
 	}
 }
 
+/*
+ * WOV keyword detection fired (real detector or test timer). The WOV capture
+ * PCM runs with SNDRV_PCM_INFO_NO_PERIOD_WAKEUP so a blocking read() has no other
+ * way to learn that a burst of drained data just landed in the host DMA buffer -
+ * wake it explicitly, the same way an HDA DMA completion IRQ would via
+ * hda_dsp_stream_check().
+ */
+static void sof_ipc4_wov_detect_handler(struct snd_sof_dev *sdev)
+{
+	struct snd_sof_pcm *spcm;
+
+	list_for_each_entry(spcm, &sdev->pcm_list, list) {
+		struct snd_sof_pcm_stream *sps = &spcm->stream[SNDRV_PCM_STREAM_CAPTURE];
+
+		if (sps->d0i3_compatible && sps->substream)
+			snd_sof_pcm_period_elapsed(sps->substream);
+	}
+}
+
 static void sof_ipc4_rx_msg(struct snd_sof_dev *sdev)
 {
 	struct sof_ipc4_msg *ipc4_msg = sdev->ipc->msg.rx_data;
@@ -845,6 +864,9 @@ static void sof_ipc4_rx_msg(struct snd_sof_dev *sdev)
 	case SOF_IPC4_NOTIFY_MODULE_NOTIFICATION:
 		data_size = sizeof(struct sof_ipc4_notify_module_data);
 		handler_func = sof_ipc4_module_notification_handler;
+		break;
+	case SOF_IPC4_NOTIFY_PHRASE_DETECTED:
+		sof_ipc4_wov_detect_handler(sdev);
 		break;
 	default:
 		dev_dbg(sdev->dev, "Unhandled DSP message: %#x|%#x\n",
